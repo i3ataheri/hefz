@@ -1,0 +1,290 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout>
+  <div class="app" id="app">
+    <div class="bg-top"></div>
+    <div class="header">
+      <h1 class="header-title">حلقة تحفيظ القرآن الأستاذة هدى</h1>
+      <p class="header-sub">مسموح التسجيل من الساعة ١ إلى ٣ بتوقيت مكة المكرمة</p>
+    </div>
+    <div class="status status--info" id="status-bar">
+      <span class="status-icon">⏳</span>
+      <div>
+        <div class="status-title">جاري التحميل...</div>
+        <div class="status-desc">يتم جلب البيانات يرجى الانتظار</div>
+      </div>
+    </div>
+    <div class="member-section" id="member-section">
+      <div class="empty-msg">جاري تحميل قائمة الأسماء...</div>
+    </div>
+    <div class="footer">وقت التسجيل: ١:٠٠ ظهرًا - ٣:٠٠ عصرًا بتوقيت مكة</div>
+  </div>
+</Layout>
+
+<script>
+const PRIORITY_MEMBER = 'هدى الغماس';
+
+const X_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+const WARN_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f57f17" stroke-width="2.5" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.29 3.86l-8.1 14c-.6 1.04.15 2.34 1.23 2.34h16.16c1.08 0 1.83-1.3 1.23-2.34l-8.1-14c-.6-1.04-2.06-1.04-2.66 0z"/></svg>';
+const CLOCK_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1b5e20" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+const CHECK_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+async function main() {
+  const statusBar = document.getElementById('status-bar');
+  const memberSection = document.getElementById('member-section');
+
+  try {
+    const mod = await import('../lib/supabase');
+    const supabase = mod.supabase;
+    if (!supabase) throw new Error('Supabase client is null');
+
+    const today = new Date().toISOString().split('T')[0];
+    const [sResult, mResult, rResult, mgrResult] = await Promise.allSettled([
+      supabase.from('settings').select('value').eq('key', 'is_saturday_enabled').single(),
+      supabase.from('members').select('name'),
+      supabase.from('registrations').select('name,created_at').eq('registered_date', today).order('created_at'),
+      supabase.from('managers').select('name').order('sort_order'),
+    ]);
+
+    const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
+    const allMembers = mResult.status === 'fulfilled' ? (mResult.value.data || []) : [];
+    const regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
+    const managers = mgrResult.status === 'fulfilled' ? (mgrResult.value.data || []).map(m => m.name) : [];
+
+    const registeredSet = new Set(regData.map(r => r.name));
+    const regOrder = {}
+    regData.forEach((r, i) => { regOrder[r.name] = i });
+
+    const startDate = new Date('2026-06-24');
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
+    const diffDays = Math.floor((d - startDate) / (1000 * 60 * 60 * 24));
+    const todayMgrIdx = managers.length > 0 ? ((diffDays % managers.length) + managers.length) % managers.length : -1;
+    const todayManager = todayMgrIdx >= 0 ? managers[todayMgrIdx] : null;
+
+    const h = d.getHours(), day = d.getDay();
+    let status = 'open';
+    if (day === 5) status = 'friday';
+    else if (day === 6 && !satEnabled) status = 'saturday';
+    else if (h < 13) status = 'before';
+    else if (h >= 15) status = 'after';
+
+    const X_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+    const WARN_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f57f17" stroke-width="2.5" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.29 3.86l-8.1 14c-.6 1.04.15 2.34 1.23 2.34h16.16c1.08 0 1.83-1.3 1.23-2.34l-8.1-14c-.6-1.04-2.06-1.04-2.66 0z"/></svg>';
+    const CLOCK_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1b5e20" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+    const CHECK_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+    const MSGS = {
+      friday:   [X_ICON, '', 'النظام مغلق يوم الجمعة.', 'error'],
+      saturday: [WARN_ICON, '', 'التسجيل مغلق اليوم (السبت). حاولي غدًا.', 'warning'],
+      before:   [CLOCK_ICON, '', 'التسجيل من ١:٠٠ ظهرًا إلى ٣:٠٠ عصرًا.', 'info'],
+      open:     [CHECK_ICON, 'التسجيل مفتوح الآن', 'اختاري اسمك من القائمة وسجّلي حضورك.', 'success'],
+      after:    [X_ICON, '', 'انتهت فترة التسجيل. حاولي غدًا من ١:٠٠ ظهرًا.', 'error'],
+    };
+    const [icon, title, desc, type] = MSGS[status];
+    statusBar.className = `status status--${type}`;
+    const titleHtml = title ? `<div class="status-title">${title}</div>` : '';
+    statusBar.innerHTML = `<span class="status-icon">${icon}</span><div>${titleHtml}<div class="status-desc">${desc}</div></div>`;
+
+    const isOpen = status === 'open';
+    const managerSet = new Set(managers);
+
+    function sortMembers() {
+      return [...allMembers].sort((a, b) => {
+        const aReg = registeredSet.has(a.name);
+        const bReg = registeredSet.has(b.name);
+        if (aReg !== bReg) return aReg ? -1 : 1;
+        if (!aReg) return a.name.localeCompare(b.name);
+
+        const aMgr = managerSet.has(a.name);
+        const bMgr = managerSet.has(b.name);
+        const aToday = a.name === todayManager;
+        const bToday = b.name === todayManager;
+        const aPri = a.name === PRIORITY_MEMBER;
+        const bPri = b.name === PRIORITY_MEMBER;
+
+        const g = (isToday, isMgr, isPri) => isToday ? 0 : isMgr ? 1 : isPri ? 2 : 3;
+        const ga = g(aToday, aMgr, aPri);
+        const gb = g(bToday, bMgr, bPri);
+        if (ga !== gb) return ga - gb;
+        return (regOrder[a.name] ?? 0) - (regOrder[b.name] ?? 0);
+      });
+    }
+
+    function renderItems() {
+      return sortMembers().map(m => {
+        const reg = registeredSet.has(m.name);
+        return `<button class="name-item${reg ? ' registered' : ''}" data-name="${m.name}" ${!isOpen || reg ? 'disabled' : ''}>
+          <span class="name-text">${m.name}</span>
+          ${reg ? '<span class="name-badge">مسجّل</span>' : '<span class="name-radio"></span>'}
+        </button>`;
+      }).join('');
+    }
+
+    let selectedName = '';
+
+    function render(keepSearch) {
+      const prevScroll = memberSection.querySelector('.member-list')?.scrollTop ?? 0;
+      const prevSearch = memberSection.querySelector('#search')?.value ?? '';
+
+      memberSection.innerHTML = `
+        <div class="search-box">
+          <input type="search" id="search" class="search-input" placeholder="ابحثي عن اسمك..." ${!isOpen ? 'disabled' : ''} />
+        </div>
+        <div class="member-list" id="member-list">${renderItems()}</div>
+        <div id="selected-info" class="selected-info" style="display:none">
+          <span class="selected-label">الاسم المختار:</span>
+          <span class="selected-name" id="selected-name"></span>
+        </div>
+        <button id="submit-btn" class="submit-btn" ${!isOpen ? 'disabled' : ''}>${isOpen ? 'تسجيل الحضور' : 'غير متاح الآن'}</button>
+        <div id="msg" class="msg" style="display:none"></div>
+      `;
+
+      const ml = document.getElementById('member-list');
+      if (ml) ml.scrollTop = prevScroll;
+
+      const searchEl = document.getElementById('search');
+      if (searchEl && keepSearch) {
+        searchEl.value = prevSearch;
+        if (prevSearch) doFilter(prevSearch);
+      }
+
+      if (!isOpen) return;
+      bindEvents();
+    }
+
+    function doFilter(q) {
+      const ml = document.getElementById('member-list');
+      ml?.querySelectorAll('.name-item').forEach(el => {
+        const match = !q || el.dataset.name.toLowerCase().includes(q.toLowerCase());
+        el.style.display = match ? '' : 'none';
+      });
+    }
+
+    function bindEvents() {
+      const searchEl = document.getElementById('search');
+      searchEl?.addEventListener('input', () => doFilter(searchEl.value.trim()));
+
+      const ml = document.getElementById('member-list');
+      ml?.addEventListener('click', (e) => {
+        const item = e.target.closest('.name-item:not(.registered):not([disabled])');
+        if (!item) return;
+        ml.querySelectorAll('.name-item').forEach(el => el.classList.remove('selected'));
+        item.classList.add('selected');
+        selectedName = item.dataset.name;
+        const nameEl = document.getElementById('selected-name');
+        if (nameEl) nameEl.textContent = selectedName;
+        const infoEl = document.getElementById('selected-info');
+        if (infoEl) infoEl.style.display = 'flex';
+        document.getElementById('submit-btn').disabled = false;
+        if (searchEl) { searchEl.value = ''; doFilter(''); }
+      });
+
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn?.addEventListener('click', async () => {
+        if (!selectedName) return;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'جاري التسجيل...';
+        const msgEl = document.getElementById('msg');
+        try {
+          const now = new Date().toISOString();
+          const { error } = await supabase.from('registrations').insert({
+            name: selectedName,
+            registered_date: today,
+            created_at: now,
+          });
+          if (error) {
+            msgEl.textContent = error.code === '23505' ? 'هذا الاسم مسجل مسبقًا اليوم.' : 'حدث خطأ. حاولي مرة أخرى.';
+            msgEl.className = 'msg msg--error';
+            msgEl.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'تسجيل الحضور';
+            return;
+          }
+          const savedName = selectedName;
+          selectedName = '';
+          msgEl.textContent = `✅ تم تسجيل ${savedName}!`;
+          msgEl.className = 'msg msg--success';
+          msgEl.style.display = 'block';
+          registeredSet.add(savedName);
+          regOrder[savedName] = regData.length;
+          regData.push({ name: savedName, created_at: now });
+          render(true);
+        } catch {
+          msgEl.textContent = 'خطأ في الاتصال. تحققي من اتصالك.';
+          msgEl.className = 'msg msg--error';
+          msgEl.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'تسجيل الحضور';
+        }
+      });
+    }
+
+    render();
+
+    if (status === 'before' || status === 'open') {
+      setInterval(() => {
+        const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
+        const target = new Date(now);
+        target.setHours(status === 'before' ? 13 : 15, 0, 0, 0);
+      }, 1000);
+    }
+
+  } catch (err) {
+    statusBar.className = 'status status--error';
+    statusBar.innerHTML = `<span class="status-icon">${X_ICON}</span><div><div class="status-title">خطأ</div><div class="status-desc">${err.message || 'حدث خطأ غير متوقع'}</div></div>`;
+    memberSection.innerHTML = '<div class="empty-msg">تعذر تحميل الصفحة</div>';
+  }
+}
+
+main();
+</script>
+
+<style lang="scss" is:global>
+@use '../styles/variables' as *;
+$font-alexandria: 'Alexandria', sans-serif;
+$font-cairo: 'Cairo', sans-serif;
+$font-almarai: 'Almarai', sans-serif;
+
+.app { max-width: 440px; margin: 0 auto; padding: 0 $spacing-md $spacing-xl; min-height: 100vh; display: flex; flex-direction: column; position: relative; overflow-x: hidden; }
+.bg-top { position: fixed; top: 0; left: 0; right: 0; height: 260px; background: linear-gradient(180deg, #e8f5e9 0%, transparent 100%); z-index: 0; pointer-events: none; }
+.header { position: relative; z-index: 1; text-align: center; padding: $spacing-lg 0 $spacing-md; }
+.header-title { font-family: $font-alexandria; font-size: 1.4rem; font-weight: 800; color: $color-primary-dark; line-height: 1.4; margin-bottom: $spacing-xs; }
+.header-sub { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; }
+.status { position: relative; z-index: 1; display: flex; align-items: center; gap: $spacing-md; padding: $spacing-md $spacing-lg; border-radius: 14px; margin-bottom: $spacing-md; background: $color-bg-card; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.status .status-icon { font-size: 1.5rem; }
+.status .status-title { font-family: $font-alexandria; font-size: $font-size-base; font-weight: 700; margin-bottom: 2px; }
+.status .status-desc { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; }
+.status--success { border-right: 3px solid $color-success; } .status--success .status-title { color: $color-success; }
+.status--error { border-right: 3px solid $color-error; } .status--error .status-title { color: $color-error; }
+.status--warning { border-right: 3px solid $color-warning; } .status--warning .status-title { color: $color-warning; }
+.status--info { border-right: 3px solid $color-primary; } .status--info .status-title { color: $color-primary; }
+.member-section { position: relative; z-index: 1; flex: 1; }
+.empty-msg { text-align: center; padding: $spacing-xl; color: $color-text-light; font-family: $font-almarai; }
+.search-box { position: sticky; top: 0; z-index: 2; padding: $spacing-sm 0; background: $color-bg; }
+.search-input { width: 100%; padding: 14px $spacing-md; font-family: $font-almarai; font-size: $font-size-base; border: 2px solid $color-border; border-radius: 12px; background: $color-bg-card; transition: border-color 0.2s; }
+.search-input:focus { border-color: $color-primary; outline: none; }
+.search-input:disabled { opacity: 0.5; }
+.search-input::placeholder { color: $color-text-light; }
+.member-list { flex: 1; overflow-y: auto; padding: $spacing-xs 0 $spacing-md; display: flex; flex-direction: column; gap: 4px; }
+.name-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px $spacing-md; font-family: $font-cairo; font-size: $font-size-base; font-weight: 600; border: none; border-radius: 10px; background: $color-bg-card; color: $color-text; text-align: right; transition: all 0.15s; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.name-item:active:not(:disabled) { transform: scale(0.97); }
+.name-item.selected { background: $color-primary; color: $color-text-on-primary; box-shadow: 0 2px 12px rgba($color-primary, 0.3); }
+.name-item.registered { background: #e8f5e9; color: $color-text-light; opacity: 0.7; cursor: default; }
+.name-item:disabled { cursor: default; }
+.name-text { font-family: $font-cairo; }
+.name-radio { width: 20px; height: 20px; border: 2px solid $color-border; border-radius: 50%; flex-shrink: 0; transition: all 0.15s; }
+.name-badge { font-family: $font-almarai; font-size: $font-size-sm; color: $color-success; font-weight: 700; flex-shrink: 0; }
+.selected-info { display: flex; align-items: center; gap: $spacing-sm; padding: $spacing-md $spacing-lg; background: #e8f5e9; border-radius: 12px; margin: $spacing-sm 0; }
+.selected-label { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; }
+.selected-name { font-family: $font-cairo; font-size: $font-size-base; font-weight: 700; color: $color-primary; }
+.submit-btn { width: 100%; padding: 14px; font-family: $font-alexandria; font-size: $font-size-base; font-weight: 700; color: $color-text-on-primary; background: $color-primary; border: none; border-radius: 12px; transition: all 0.15s; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.submit-btn:active:not(:disabled) { transform: scale(0.97); }
+.submit-btn:disabled { background: $color-disabled; }
+.submit-btn:not(:disabled) { box-shadow: 0 4px 16px rgba($color-primary, 0.3); }
+.msg { font-family: $font-almarai; text-align: center; padding: $spacing-md; border-radius: 10px; margin-top: $spacing-md; font-weight: 600; }
+.msg--success { background: #e8f5e9; color: $color-success; }
+.msg--error { background: #ffebee; color: $color-error; }
+.footer { font-family: $font-almarai; text-align: center; padding: $spacing-lg 0 $spacing-md; color: $color-text-light; font-size: $font-size-sm; }
+</style>

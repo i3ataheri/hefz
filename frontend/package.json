@@ -1,0 +1,21 @@
+{
+  "name": "hefz-quran-registration",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Quran circle registration system",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "lint": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/vercel": "^9.0.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "astro": "^5.0.0",
+    "sass": "^1.85.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

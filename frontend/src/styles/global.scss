@@ -1,0 +1,56 @@
+@use 'variables' as *;
+@import url('https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap');
+
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: $font-almarai;
+  font-size: $font-size-base;
+  color: $color-text;
+  background-color: $color-bg;
+  direction: rtl;
+  text-align: right;
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+button {
+  cursor: pointer;
+  font-family: $font-almarai;
+  border: none;
+  outline: none;
+}
+
+input {
+  font-family: $font-almarai;
+  outline: none;
+}
+
+a {
+  color: $color-primary;
+  text-decoration: none;
+}
+
+::selection {
+  background-color: $color-primary-light;
+  color: $color-text-on-primary;
+}
