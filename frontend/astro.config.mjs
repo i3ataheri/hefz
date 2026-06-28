@@ -22,7 +22,10 @@ function loadDotEnv(path) {
   return raw;
 }
 
-const env = loadDotEnv('.env');
+const env = { ...loadDotEnv('.env') };
+// Fallback to process.env (used on Vercel where .env is not present)
+if (!env.VITE_SUPABASE_URL) env.VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+if (!env.VITE_SUPABASE_ANON_KEY) env.VITE_SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
 export default defineConfig({
   output: 'static',

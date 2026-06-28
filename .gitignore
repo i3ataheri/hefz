@@ -4,3 +4,5 @@ dist/
 .vercel/
 .astro/
 local.txt
+
+.vercel
