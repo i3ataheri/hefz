@@ -1,0 +1,6 @@
+{
+  "rootDirectory": "frontend",
+  "framework": "astro",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
+}
