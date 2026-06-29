@@ -24,8 +24,6 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <script>
-const PRIORITY_MEMBER = 'هدى الغماس';
-
 const X_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
 const WARN_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f57f17" stroke-width="2.5" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.29 3.86l-8.1 14c-.6 1.04.15 2.34 1.23 2.34h16.16c1.08 0 1.83-1.3 1.23-2.34l-8.1-14c-.6-1.04-2.06-1.04-2.66 0z"/></svg>';
 const CLOCK_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1b5e20" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
@@ -41,14 +39,16 @@ async function main() {
     if (!supabase) throw new Error('Supabase client is null');
 
     const today = new Date().toISOString().split('T')[0];
-    const [sResult, mResult, rResult, mgrResult] = await Promise.allSettled([
+    const [sResult, pResult, mResult, rResult, mgrResult] = await Promise.allSettled([
       supabase.from('settings').select('value').eq('key', 'is_saturday_enabled').single(),
+      supabase.from('settings').select('value').eq('key', 'priority_member').single(),
       supabase.from('members').select('name'),
       supabase.from('registrations').select('name,created_at').eq('registered_date', today).order('created_at'),
       supabase.from('managers').select('name').order('sort_order'),
     ]);
 
     const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
+    const priorityMember = pResult.status === 'fulfilled' && pResult.value.data?.value ? String(pResult.value.data.value) : '';
     const allMembers = mResult.status === 'fulfilled' ? (mResult.value.data || []) : [];
     const regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
     const managers = mgrResult.status === 'fulfilled' ? (mgrResult.value.data || []).map(m => m.name) : [];
@@ -101,8 +101,8 @@ async function main() {
         const bMgr = managerSet.has(b.name);
         const aToday = a.name === todayManager;
         const bToday = b.name === todayManager;
-        const aPri = a.name === PRIORITY_MEMBER;
-        const bPri = b.name === PRIORITY_MEMBER;
+        const aPri = priorityMember && a.name === priorityMember;
+        const bPri = priorityMember && b.name === priorityMember;
 
         const g = (isToday, isMgr, isPri) => isToday ? 0 : isMgr ? 1 : isPri ? 2 : 3;
         const ga = g(aToday, aMgr, aPri);
@@ -258,21 +258,23 @@ async function main() {
     }
 
     function buildReportText() {
-      const present = regData.map(function(r) { return r.name; });
+      var hijri = new Date().toLocaleDateString('ar-SA', { calendar: 'islamic', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      var sorted = sortMembers().filter(function(m) { return registeredSet.has(m.name); });
       var lines = [];
-      lines.push('تقرير حضور حلقة تحفيظ القرآن');
-      lines.push('التاريخ: ' + today);
+      lines.push('اليوم ' + hijri);
       lines.push('');
-      lines.push('الحاضرات:');
-      present.forEach(function(n, i) { lines.push((i+1) + '. ' + n); });
-      var absent = allMembers.filter(function(m) { return !registeredSet.has(m.name); }).map(function(m) { return m.name; });
-      if (absent.length) {
-        lines.push('');
-        lines.push('الغائبات:');
-        absent.forEach(function(n, i) { lines.push((i+1) + '. ' + n); });
+      var num = 0;
+      for (var i = 0; i < sorted.length; i++) {
+        var m = sorted[i];
+        if (registeredSet.has(m.name)) {
+          num++;
+          var tag = '';
+          if (m.name === todayManager) tag = ' (المديرة)';
+          else if (managerSet.has(m.name)) tag = ' (مديرة)';
+          else if (m.name === priorityMember) tag = ' (مساعدة)';
+          lines.push(num + '. ' + m.name + tag);
+        }
       }
-      lines.push('');
-      lines.push('العدد الإجمالي: ' + present.length + '/' + allMembers.length);
       return lines.join('\n');
     }
 

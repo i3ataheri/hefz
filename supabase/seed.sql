@@ -97,8 +97,4 @@ INSERT INTO members (name, sort_order) VALUES
 -- Insert default settings
 INSERT INTO settings (key, value) VALUES
   ('is_saturday_enabled', 'false'::jsonb),
-  ('timezone', '"Asia/Riyadh"'::jsonb),
-  ('registration_open_hour', '13'::jsonb),
-  ('registration_close_hour', '15'::jsonb),
-  ('whatsapp_group_id', '""'::jsonb),
-  ('report_time_hour', '15'::jsonb);
+  ('priority_member', '"هدى الغماس"'::jsonb);
