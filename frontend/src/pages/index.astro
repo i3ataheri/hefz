@@ -45,17 +45,13 @@ async function main() {
       supabase.from('settings').select('value').eq('key', 'is_saturday_enabled').single(),
       supabase.from('members').select('name'),
       supabase.from('registrations').select('name,created_at').eq('registered_date', today).order('created_at'),
-      supabase.from('managers').select('name,pin').order('sort_order'),
+      supabase.from('managers').select('name').order('sort_order'),
     ]);
 
     const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
     const allMembers = mResult.status === 'fulfilled' ? (mResult.value.data || []) : [];
     const regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
     const managers = mgrResult.status === 'fulfilled' ? (mgrResult.value.data || []).map(m => m.name) : [];
-    const managerPins = {};
-    if (mgrResult.status === 'fulfilled') {
-      (mgrResult.value.data || []).forEach(m => { managerPins[m.name] = m.pin });
-    }
 
     const registeredSet = new Set(regData.map(r => r.name));
     const regOrder = {}
@@ -309,14 +305,17 @@ async function main() {
       var pinBtn = document.getElementById('pin-verify-btn');
       var pinError = document.getElementById('pin-error');
 
-      pinBtn.onclick = function() {
+      pinBtn.onclick = async function() {
         var entered = pinInput ? pinInput.value.trim() : '';
         if (!entered) { pinError.style.display = 'block'; return; }
-        var found = false;
-        for (var name in managerPins) {
-          if (managerPins[name] === entered) { found = true; break; }
-        }
-        if (found) {
+        pinBtn.disabled = true;
+        var valid = false;
+        try {
+          var { data, error } = await supabase.rpc('verify_manager_pin', { input_pin: entered });
+          if (!error && data === true) valid = true;
+        } catch(e) {}
+        pinBtn.disabled = false;
+        if (valid) {
           pinError.style.display = 'none';
           document.querySelector('.manager-verify').style.display = 'none';
           document.getElementById('report-content').style.display = 'block';

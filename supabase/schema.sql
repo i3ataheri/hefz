@@ -92,3 +92,17 @@ CREATE POLICY "allow_anonymous_select_members"
   ON members FOR SELECT
   TO anon
   USING (true);
+
+-- Allow anonymous users to call the PIN verification function
+GRANT EXECUTE ON FUNCTION verify_manager_pin TO anon;
+
+-- Securely verify if a PIN belongs to any manager (PIN never leaves the DB)
+CREATE OR REPLACE FUNCTION verify_manager_pin(input_pin TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM managers WHERE pin = input_pin);
+END;
+$$;
