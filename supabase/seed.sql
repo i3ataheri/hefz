@@ -5,16 +5,16 @@
 
 -- Insert managers (replace with actual names)
 -- IMPORTANT: names must EXACTLY match the members table below
-INSERT INTO managers (name, sort_order) VALUES
-  ('أولياء',          1),
-  ('دعاء',            2),
-  ('منيرة',           3),
-  ('مريم',            4),
-  ('عائشة أبوعقيل',   5),
-  ('طيف',             6),
-  ('دانا',            7),
-  ('حنان',            8),
-  ('إيمان أحمد',      9);
+INSERT INTO managers (name, sort_order, pin) VALUES
+  ('أولياء',          1, '1234'),
+  ('دعاء',            2, '2345'),
+  ('منيرة',           3, '3456'),
+  ('مريم',            4, '4567'),
+  ('عائشة أبوعقيل',   5, '5678'),
+  ('طيف',             6, '6789'),
+  ('دانا',            7, '7891'),
+  ('حنان',            8, '8912'),
+  ('إيمان أحمد',      9, '9123');
 
 -- Insert members list (all names including managers)
 INSERT INTO members (name, sort_order) VALUES

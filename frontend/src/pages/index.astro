@@ -45,13 +45,17 @@ async function main() {
       supabase.from('settings').select('value').eq('key', 'is_saturday_enabled').single(),
       supabase.from('members').select('name'),
       supabase.from('registrations').select('name,created_at').eq('registered_date', today).order('created_at'),
-      supabase.from('managers').select('name').order('sort_order'),
+      supabase.from('managers').select('name,pin').order('sort_order'),
     ]);
 
     const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
     const allMembers = mResult.status === 'fulfilled' ? (mResult.value.data || []) : [];
     const regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
     const managers = mgrResult.status === 'fulfilled' ? (mgrResult.value.data || []).map(m => m.name) : [];
+    const managerPins = {};
+    if (mgrResult.status === 'fulfilled') {
+      (mgrResult.value.data || []).forEach(m => { managerPins[m.name] = m.pin });
+    }
 
     const registeredSet = new Set(regData.map(r => r.name));
     const regOrder = {}
@@ -63,12 +67,12 @@ async function main() {
     const todayMgrIdx = managers.length > 0 ? ((diffDays % managers.length) + managers.length) % managers.length : -1;
     const todayManager = todayMgrIdx >= 0 ? managers[todayMgrIdx] : null;
 
-    // const h = d.getHours(), day = d.getDay();
+    const h = d.getHours(), day = d.getDay();
     let status = 'open';
-    // if (day === 5) status = 'friday';
-    // else if (day === 6 && !satEnabled) status = 'saturday';
-    // else if (h < 13) status = 'before';
-    // else if (h >= 15) status = 'after';
+    if (day === 5) status = 'friday';
+    else if (day === 6 && !satEnabled) status = 'saturday';
+    else if (h < 13) status = 'before';
+    else if (h >= 15) status = 'after';
 
     const X_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
     const WARN_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f57f17" stroke-width="2.5" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.29 3.86l-8.1 14c-.6 1.04.15 2.34 1.23 2.34h16.16c1.08 0 1.83-1.3 1.23-2.34l-8.1-14c-.6-1.04-2.06-1.04-2.66 0z"/></svg>';
@@ -80,7 +84,7 @@ async function main() {
       saturday: [WARN_ICON, '', 'التسجيل مغلق اليوم (السبت). حاولي غدًا.', 'warning'],
       before:   [CLOCK_ICON, '', 'التسجيل من ١:٠٠ ظهرًا إلى ٣:٠٠ عصرًا.', 'info'],
       open:     [CHECK_ICON, 'التسجيل مفتوح الآن', 'اختاري اسمك من القائمة وسجّلي حضورك.', 'success'],
-      after:    [X_ICON, '', 'انتهت فترة التسجيل. حاولي غدًا من ١:٠٠ ظهرًا.', 'error'],
+      after:    [X_ICON, 'انتهت فترة التسجيل', 'يمكن للمديرة نسخ التقرير من الأسفل.', 'error'],
     };
     const [icon, title, desc, type] = MSGS[status];
     statusBar.className = `status status--${type}`;
@@ -139,6 +143,7 @@ async function main() {
         </div>
         <button id="submit-btn" class="submit-btn" ${!isOpen ? 'disabled' : ''}>${isOpen ? 'تسجيل الحضور' : 'غير متاح الآن'}</button>
         <div id="msg" class="msg" style="display:none"></div>
+        <div id="report-section" class="report-section" style="display:none"></div>
       `;
 
       const ml = document.getElementById('member-list');
@@ -252,6 +257,87 @@ async function main() {
       }, 1000);
     }
 
+    if (status === 'after') {
+      showReportSection();
+    }
+
+    function buildReportText() {
+      const present = regData.map(function(r) { return r.name; });
+      var lines = [];
+      lines.push('تقرير حضور حلقة تحفيظ القرآن');
+      lines.push('التاريخ: ' + today);
+      lines.push('');
+      lines.push('الحاضرات:');
+      present.forEach(function(n, i) { lines.push((i+1) + '. ' + n); });
+      var absent = allMembers.filter(function(m) { return !registeredSet.has(m.name); }).map(function(m) { return m.name; });
+      if (absent.length) {
+        lines.push('');
+        lines.push('الغائبات:');
+        absent.forEach(function(n, i) { lines.push((i+1) + '. ' + n); });
+      }
+      lines.push('');
+      lines.push('العدد الإجمالي: ' + present.length + '/' + allMembers.length);
+      return lines.join('\n');
+    }
+
+    function showReportSection() {
+      var section = document.getElementById('report-section');
+      if (!section) return;
+      section.style.display = 'block';
+      var presentCount = registeredSet.size;
+
+      section.innerHTML =
+        '<div class="report-summary">' +
+          '<div class="report-title">تقرير اليوم</div>' +
+          '<div class="report-count">الحاضرات: ' + presentCount + ' / ' + allMembers.length + '</div>' +
+        '</div>' +
+        '<div class="manager-verify">' +
+          '<p class="verify-hint">لنسخ التقرير، أدخلي رمز التفعيل</p>' +
+          '<div class="verify-row">' +
+            '<input type="password" id="pin-input" class="pin-input" placeholder="الرمز" maxlength="4" inputmode="numeric" />' +
+            '<button id="pin-verify-btn" class="verify-btn">تأكيد</button>' +
+          '</div>' +
+          '<div id="pin-error" class="pin-error" style="display:none">الرمز غير صحيح</div>' +
+        '</div>' +
+        '<div id="report-content" class="report-content" style="display:none">' +
+          '<textarea id="report-text" class="report-text" readonly></textarea>' +
+          '<button id="copy-btn" class="copy-btn">نسخ التقرير</button>' +
+          '<div id="copy-msg" class="copy-msg" style="display:none">تم النسخ! ألصقي التقرير في مجموعة واتساب</div>' +
+        '</div>';
+
+      var pinInput = document.getElementById('pin-input');
+      var pinBtn = document.getElementById('pin-verify-btn');
+      var pinError = document.getElementById('pin-error');
+
+      pinBtn.onclick = function() {
+        var entered = pinInput ? pinInput.value.trim() : '';
+        if (!entered) { pinError.style.display = 'block'; return; }
+        var found = false;
+        for (var name in managerPins) {
+          if (managerPins[name] === entered) { found = true; break; }
+        }
+        if (found) {
+          pinError.style.display = 'none';
+          document.querySelector('.manager-verify').style.display = 'none';
+          document.getElementById('report-content').style.display = 'block';
+          document.getElementById('report-text').value = buildReportText();
+        } else {
+          pinError.style.display = 'block';
+        }
+      };
+
+      var copyBtn = document.getElementById('copy-btn');
+      if (copyBtn) {
+        copyBtn.onclick = function() {
+          var textarea = document.getElementById('report-text');
+          textarea.select();
+          textarea.setSelectionRange(0, 99999);
+          navigator.clipboard.writeText(textarea.value);
+          document.getElementById('copy-msg').style.display = 'block';
+        };
+      }
+    }
+
   } catch (err) {
     statusBar.className = 'status status--error';
     statusBar.innerHTML = `<span class="status-icon">${X_ICON}</span><div><div class="status-title">خطأ</div><div class="status-desc">${err.message || 'حدث خطأ غير متوقع'}</div></div>`;
@@ -308,4 +394,20 @@ $font-almarai: 'Almarai', sans-serif;
 .msg--success { background: #e8f5e9; color: $color-success; }
 .msg--error { background: #ffebee; color: $color-error; }
 .footer { font-family: $font-almarai; text-align: center; padding: $spacing-lg 0 $spacing-md; color: $color-text-light; font-size: $font-size-sm; }
+.report-section { margin-top: $spacing-lg; padding: $spacing-md; background: $color-bg-card; border-radius: 14px; border: 2px solid $color-primary; }
+.report-summary { text-align: center; margin-bottom: $spacing-md; }
+.report-title { font-family: $font-alexandria; font-size: 1.2rem; font-weight: 800; color: $color-primary-dark; margin-bottom: $spacing-xs; }
+.report-count { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; }
+.verify-hint { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; margin-bottom: $spacing-sm; text-align: center; }
+.verify-row { display: flex; gap: $spacing-sm; }
+.pin-input { flex: 1; padding: 14px; font-family: $font-almarai; font-size: 1.5rem; text-align: center; border: 2px solid $color-border; border-radius: 12px; background: $color-bg-card; letter-spacing: 8px; }
+.pin-input:focus { border-color: $color-primary; outline: none; }
+.verify-btn { padding: 14px 24px; font-family: $font-alexandria; font-size: $font-size-base; font-weight: 700; color: $color-text-on-primary; background: $color-primary; border: none; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+.verify-btn:active { transform: scale(0.97); }
+.pin-error { font-family: $font-almarai; font-size: $font-size-sm; color: $color-error; text-align: center; margin-top: $spacing-sm; }
+.report-content { margin-top: $spacing-md; }
+.report-text { width: 100%; min-height: 250px; padding: $spacing-md; font-family: $font-cairo; font-size: $font-size-sm; border: 2px solid $color-border; border-radius: 12px; background: #f9f9f9; direction: rtl; resize: none; }
+.copy-btn { width: 100%; padding: 14px; font-family: $font-alexandria; font-size: $font-size-base; font-weight: 700; color: $color-text-on-primary; background: $color-primary; border: none; border-radius: 12px; margin-top: $spacing-md; -webkit-tap-highlight-color: transparent; }
+.copy-btn:active { transform: scale(0.97); }
+.copy-msg { font-family: $font-almarai; font-size: $font-size-sm; color: $color-success; text-align: center; margin-top: $spacing-sm; font-weight: 600; }
 </style>

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS managers (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   sort_order INTEGER NOT NULL DEFAULT 0,
+  pin TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -46,6 +47,9 @@ CREATE INDEX IF NOT EXISTS idx_registrations_date
 -- Index for cleanup queries
 CREATE INDEX IF NOT EXISTS idx_registrations_cleanup
   ON registrations (registered_date);
+
+-- Migration for existing DBs: add PIN column if not exists
+ALTER TABLE managers ADD COLUMN IF NOT EXISTS pin TEXT NOT NULL DEFAULT '';
 
 -- Enable Row Level Security (optional, for future admin panel)
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
