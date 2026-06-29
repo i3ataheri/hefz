@@ -380,13 +380,13 @@ $font-almarai: 'Almarai', sans-serif;
 .name-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px $spacing-md; font-family: $font-cairo; font-size: $font-size-base; font-weight: 600; border: 1px solid transparent; border-radius: 12px; background: $color-bg-card; color: $color-text; text-align: right; transition: all 0.15s; -webkit-tap-highlight-color: transparent; touch-action: manipulation; box-shadow: $shadow-sm; }
 .name-item:active:not(:disabled) { transform: scale(0.97); }
 .name-item.selected { background: linear-gradient(135deg, $color-primary, #b84a6a); color: $color-text-on-primary; border-color: $color-primary; box-shadow: 0 3px 14px rgba($color-primary, 0.3); }
-.name-item.registered { background: #f0f7f0; border-color: #d4e8d4; color: $color-text-light; opacity: 0.7; cursor: default; }
+.name-item.registered { background: #f5edef; border-color: #ecd9de; color: #b09aa0; cursor: default; }
 .name-item:disabled { cursor: default; }
 .name-text { font-family: $font-cairo; }
 .name-radio { width: 20px; height: 20px; border: 2px solid $color-border; border-radius: 50%; flex-shrink: 0; transition: all 0.15s; position: relative; }
 .name-item.selected .name-radio { border-color: rgba(255,255,255,0.5); }
 .name-item.selected .name-radio::after { content: ''; position: absolute; top: 4px; left: 4px; right: 4px; bottom: 4px; background: rgba(255,255,255,0.8); border-radius: 50%; }
-.name-badge { font-family: $font-almarai; font-size: $font-size-sm; color: $color-success; font-weight: 700; flex-shrink: 0; }
+.name-badge { font-family: $font-almarai; font-size: $font-size-sm; color: #b09aa0; font-weight: 700; flex-shrink: 0; }
 .selected-info { display: flex; align-items: center; gap: $spacing-sm; padding: $spacing-md $spacing-lg; background: linear-gradient(135deg, #fce8ee, #fdf2f5); border: 1px solid $color-border; border-radius: 14px; margin: $spacing-sm 0; }
 .selected-label { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; }
 .selected-name { font-family: $font-cairo; font-size: $font-size-base; font-weight: 700; color: $color-primary; }
