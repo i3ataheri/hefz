@@ -38,7 +38,7 @@ async function main() {
     const supabase = mod.supabase;
     if (!supabase) throw new Error('Supabase client is null');
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Riyadh' });
     const [sResult, pResult, mResult, rResult, mgrResult] = await Promise.allSettled([
       supabase.from('settings').select('value').eq('key', 'is_saturday_enabled').single(),
       supabase.from('settings').select('value').eq('key', 'priority_member').single(),
@@ -50,20 +50,29 @@ async function main() {
     const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
     const priorityMember = pResult.status === 'fulfilled' && pResult.value.data?.value ? String(pResult.value.data.value) : '';
     const allMembers = mResult.status === 'fulfilled' ? (mResult.value.data || []) : [];
-    const regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
+    let regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
     const managers = mgrResult.status === 'fulfilled' ? (mgrResult.value.data || []).map(m => m.name) : [];
+
+    // Auto-cleanup old registrations before registration opens
+    const _riyadhNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
+    if (_riyadhNow.getHours() < 13 && regData.length > 0 && managers.length > 0) {
+      try { await supabase.rpc('cleanup_old_registrations'); regData = []; } catch {}
+    }
 
     const registeredSet = new Set(regData.map(r => r.name));
     const regOrder = {}
     regData.forEach((r, i) => { regOrder[r.name] = i });
 
+    const now = new Date();
+    const riyadhNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
+    const riyadhH = riyadhNow.getHours();
+    const riyadhDay = riyadhNow.getDay();
     const startDate = new Date('2026-06-24');
-    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
-    const diffDays = Math.floor((d - startDate) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor((riyadhNow - startDate) / (1000 * 60 * 60 * 24));
     const todayMgrIdx = managers.length > 0 ? ((diffDays % managers.length) + managers.length) % managers.length : -1;
     const todayManager = todayMgrIdx >= 0 ? managers[todayMgrIdx] : null;
 
-    const h = d.getHours(), day = d.getDay();
+    const h = riyadhH, day = riyadhDay;
     let status = 'open';
     if (day === 5) status = 'friday';
     else if (day === 6 && !satEnabled) status = 'saturday';
@@ -87,7 +96,7 @@ async function main() {
     const titleHtml = title ? `<div class="status-title">${title}</div>` : '';
     statusBar.innerHTML = `<span class="status-icon">${icon}</span><div>${titleHtml}<div class="status-desc">${desc}</div></div>`;
 
-    const isOpen = status === 'open';
+    let isOpen = status === 'open';
     const managerSet = new Set(managers);
 
     function sortMembers() {
@@ -245,16 +254,38 @@ async function main() {
 
     render();
 
+    function checkTimeAndUpdate() {
+      const n = new Date();
+      var rH = n.getUTCHours() + 3;
+      var rDay = n.getUTCDay();
+      if (rH >= 24) { rH -= 24; rDay = (rDay + 1) % 7; }
+      var newStatus = 'open';
+      if (rDay === 5) newStatus = 'friday';
+      else if (rDay === 6 && !satEnabled) newStatus = 'saturday';
+      else if (rH < 13) newStatus = 'before';
+      else if (rH >= 15) newStatus = 'after';
+
+      if (newStatus !== status) {
+        status = newStatus;
+        isOpen = status === 'open';
+        document.getElementById('submit-btn').disabled = !isOpen;
+        document.getElementById('submit-btn').textContent = isOpen ? 'تسجيل الحضور' : 'غير متاح الآن';
+        const [icon, title, desc, type] = MSGS[status];
+        statusBar.className = 'status status--' + type;
+        statusBar.innerHTML = '<span class="status-icon">' + icon + '</span><div>' + (title ? '<div class="status-title">' + title + '</div>' : '') + '<div class="status-desc">' + desc + '</div></div>';
+        if (status === 'after') { try { showReportSection(); } catch(e) {} }
+      }
+    }
+
     if (status === 'before' || status === 'open') {
-      setInterval(() => {
-        const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
-        const target = new Date(now);
-        target.setHours(status === 'before' ? 13 : 15, 0, 0, 0);
-      }, 1000);
+      setInterval(checkTimeAndUpdate, 1000);
     }
 
     if (status === 'after') {
-      showReportSection();
+      try { showReportSection(); } catch(e) {
+        statusBar.className = 'status status--error';
+        statusBar.innerHTML = '<span class="status-icon">' + X_ICON + '</span><div><div class="status-title">خطأ في التقرير</div><div class="status-desc">' + (e.message || '') + '</div></div>';
+      }
     }
 
     function buildReportText() {
@@ -271,7 +302,6 @@ async function main() {
           var tag = '';
           if (m.name === todayManager) tag = ' (المديرة)';
           else if (managerSet.has(m.name)) tag = ' (مديرة)';
-          else if (m.name === priorityMember) tag = ' (مساعدة)';
           lines.push(num + '. ' + m.name + tag);
         }
       }
@@ -299,33 +329,42 @@ async function main() {
         '</div>' +
         '<div id="report-content" class="report-content" style="display:none">' +
           '<textarea id="report-text" class="report-text" readonly></textarea>' +
-          '<button id="copy-btn" class="copy-btn">نسخ التقرير</button>' +
-          '<div id="copy-msg" class="copy-msg" style="display:none">تم النسخ! ألصقي التقرير في مجموعة واتساب</div>' +
+          '<div class="btn-row">' +
+            '<button id="share-btn" class="share-btn">مشاركة</button>' +
+            '<button id="copy-btn" class="copy-btn">نسخ التقرير</button>' +
+          '</div>' +
+          '<div id="copy-msg" class="copy-msg" style="display:none">تم النسخ!</div>' +
         '</div>';
 
       var pinInput = document.getElementById('pin-input');
       var pinBtn = document.getElementById('pin-verify-btn');
       var pinError = document.getElementById('pin-error');
 
-      pinBtn.onclick = async function() {
-        var entered = pinInput ? pinInput.value.trim() : '';
-        if (!entered) { pinError.style.display = 'block'; return; }
-        pinBtn.disabled = true;
-        var valid = false;
-        try {
-          var { data, error } = await supabase.rpc('verify_manager_pin', { input_pin: entered });
-          if (!error && data === true) valid = true;
-        } catch(e) {}
-        pinBtn.disabled = false;
-        if (valid) {
-          pinError.style.display = 'none';
-          document.querySelector('.manager-verify').style.display = 'none';
-          document.getElementById('report-content').style.display = 'block';
-          document.getElementById('report-text').value = buildReportText();
-        } else {
-          pinError.style.display = 'block';
-        }
-      };
+      if (pinBtn) {
+        pinBtn.onclick = async function() {
+          var entered = pinInput ? pinInput.value.trim() : '';
+          if (!entered) { pinError.style.display = 'block'; return; }
+          pinBtn.disabled = true;
+          var valid = false;
+          try {
+            var { data, error } = await supabase.rpc('verify_manager_pin', { input_pin: entered });
+            if (!error && data === true) valid = true;
+          } catch(e) {}
+          pinBtn.disabled = false;
+          if (valid) {
+            pinError.style.display = 'none';
+            document.querySelector('.manager-verify').style.display = 'none';
+            var rc = document.getElementById('report-content');
+            if (rc) rc.style.display = 'block';
+            var rt = document.getElementById('report-text');
+            if (rt) rt.value = buildReportText();
+            var copyMsg = document.getElementById('copy-msg');
+            if (copyMsg) copyMsg.style.display = 'none';
+          } else {
+            pinError.style.display = 'block';
+          }
+        };
+      }
 
       var copyBtn = document.getElementById('copy-btn');
       if (copyBtn) {
@@ -335,6 +374,19 @@ async function main() {
           textarea.setSelectionRange(0, 99999);
           navigator.clipboard.writeText(textarea.value);
           document.getElementById('copy-msg').style.display = 'block';
+        };
+      }
+
+      var shareBtn = document.getElementById('share-btn');
+      if (shareBtn) {
+        shareBtn.onclick = function() {
+          var text = document.getElementById('report-text').value;
+          if (navigator.share) {
+            navigator.share({ text: text });
+          } else {
+            navigator.clipboard.writeText(text);
+            document.getElementById('copy-msg').style.display = 'block';
+          }
         };
       }
     }
@@ -377,7 +429,11 @@ $font-almarai: 'Almarai', sans-serif;
 .search-input:disabled { opacity: 0.5; }
 .search-input::placeholder { color: $color-text-light; font-weight: 300; }
 .member-list { flex: 1; overflow-y: auto; padding: $spacing-xs 0 $spacing-md; display: flex; flex-direction: column; gap: 6px; }
-.name-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px $spacing-md; font-family: $font-cairo; font-size: $font-size-base; font-weight: 600; border: 1px solid transparent; border-radius: 12px; background: $color-bg-card; color: $color-text; text-align: right; transition: all 0.15s; -webkit-tap-highlight-color: transparent; touch-action: manipulation; box-shadow: $shadow-sm; }
+.name-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px $spacing-md; font-family: $font-cairo; font-size: $font-size-base; font-weight: 600; border: 1px solid transparent; border-radius: 12px; background: $color-bg-card; color: $color-text; text-align: right; transition: all 0.15s; -webkit-tap-highlight-color: transparent; touch-action: manipulation; box-shadow: $shadow-sm; position: relative; overflow: hidden; }
+.name-item::before { content: ''; position: absolute; bottom: 0; left: 0; width: 56px; height: 100%; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23b87a92' stroke-width='0.6' opacity='0.35'%3E%3Cpath d='M55 10 C42 20 35 30 28 38 C24 43 20 47 18 52'/%3E%3Cpath d='M42 22 C38 24 36 26 37 30'/%3E%3C/g%3E%3Cg fill='%23d4a0b4' opacity='0.25'%3E%3Cpath d='M46 18 Q40 20 42 24 Q44 20 46 18'/%3E%3Cpath d='M34 34 Q28 36 30 40 Q32 36 34 34'/%3E%3Cellipse cx='16' cy='52' rx='3' ry='5.5' transform='rotate(-25 16 52)'/%3E%3Cellipse cx='16' cy='52' rx='3' ry='5.5' transform='rotate(25 16 52)'/%3E%3Cellipse cx='16' cy='52' rx='3' ry='5.5' transform='rotate(75 16 52)'/%3E%3Cellipse cx='16' cy='52' rx='3' ry='5.5' transform='rotate(125 16 52)'/%3E%3Cellipse cx='16' cy='52' rx='3' ry='5.5' transform='rotate(175 16 52)'/%3E%3Ccircle cx='16' cy='52' r='1.8' fill='%23f0c8d4' opacity='0.5'/%3E%3C/g%3E%3Ccircle cx='50' cy='14' r='1' fill='%23d4a0b4' opacity='0.2'/%3E%3Ccircle cx='38' cy='28' r='0.8' fill='%23d4a0b4' opacity='0.2'/%3E%3C/svg%3E") no-repeat bottom left; background-size: auto 85%; opacity: 0.13; pointer-events: none; z-index: 0; transition: opacity 0.25s, filter 0.25s; }
+.name-item.selected::before { opacity: 0.2; filter: brightness(2); }
+.name-item.registered::before { opacity: 0.05; }
+.name-item > * { position: relative; z-index: 1; }
 .name-item:active:not(:disabled) { transform: scale(0.97); }
 .name-item.selected { background: linear-gradient(135deg, $color-primary, #b84a6a); color: $color-text-on-primary; border-color: $color-primary; box-shadow: 0 3px 14px rgba($color-primary, 0.3); }
 .name-item.registered { background: #f5edef; border-color: #ecd9de; color: #b09aa0; cursor: default; }
@@ -398,20 +454,25 @@ $font-almarai: 'Almarai', sans-serif;
 .msg--success { background: #f0f7f0; color: $color-success; }
 .msg--error { background: #fef0f0; color: $color-error; }
 .footer { font-family: $font-almarai; text-align: center; padding: $spacing-lg 0 $spacing-md; color: $color-text-light; font-size: $font-size-sm; font-weight: 300; }
-.report-section { margin-top: $spacing-lg; padding: $spacing-lg; background: $color-bg-card; border-radius: 16px; border: 2px solid $color-primary-light; }
+.report-section { margin-top: $spacing-lg; padding: $spacing-lg; background: $color-bg-card; border-radius: 16px; box-shadow: $shadow-sm; border: 1px solid $color-border; }
 .report-summary { text-align: center; margin-bottom: $spacing-md; }
 .report-title { font-family: $font-alexandria; font-size: 1.2rem; font-weight: 800; color: $color-primary-dark; margin-bottom: $spacing-xs; }
 .report-count { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; }
+.manager-verify { background: #fdf8f9; border: 1px solid $color-border; border-radius: 14px; padding: $spacing-lg $spacing-md; }
 .verify-hint { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; margin-bottom: $spacing-sm; text-align: center; }
-.verify-row { display: flex; gap: $spacing-sm; }
-.pin-input { flex: 1; padding: 14px; font-family: $font-almarai; font-size: 1.5rem; text-align: center; border: 2px solid $color-border; border-radius: 14px; background: $color-bg-card; letter-spacing: 8px; transition: border-color 0.2s; }
+.verify-row { display: flex; gap: $spacing-sm; justify-content: center; align-items: center; }
+.pin-input { width: 130px; padding: 12px; font-family: $font-almarai; font-size: 1.2rem; text-align: center; border: 2px solid $color-border; border-radius: 12px; background: $color-bg-card; letter-spacing: 6px; transition: border-color 0.2s; box-sizing: border-box; }
 .pin-input:focus { border-color: $color-primary; outline: none; box-shadow: 0 0 0 3px rgba($color-primary, 0.1); }
-.verify-btn { padding: 14px 24px; font-family: $font-alexandria; font-size: $font-size-base; font-weight: 700; color: $color-text-on-primary; background: linear-gradient(135deg, $color-primary, #b84a6a); border: none; border-radius: 14px; -webkit-tap-highlight-color: transparent; }
+.verify-btn { padding: 12px 20px; font-family: $font-alexandria; font-size: $font-size-sm; font-weight: 700; color: $color-text-on-primary; background: linear-gradient(135deg, $color-primary, #b84a6a); border: none; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
 .verify-btn:active { transform: scale(0.97); }
 .pin-error { font-family: $font-almarai; font-size: $font-size-sm; color: $color-error; text-align: center; margin-top: $spacing-sm; }
 .report-content { margin-top: $spacing-md; }
 .report-text { width: 100%; min-height: 250px; padding: $spacing-md; font-family: $font-cairo; font-size: $font-size-sm; border: 2px solid $color-border; border-radius: 14px; background: #fdf8f9; direction: rtl; resize: none; }
-.copy-btn { width: 100%; padding: 14px; font-family: $font-alexandria; font-size: $font-size-base; font-weight: 700; color: $color-text-on-primary; background: linear-gradient(135deg, $color-primary, #b84a6a); border: none; border-radius: 14px; margin-top: $spacing-md; -webkit-tap-highlight-color: transparent; }
+.btn-row { display: flex; gap: $spacing-sm; margin-top: $spacing-md; }
+.share-btn, .copy-btn { flex: 1; padding: 14px; font-family: $font-alexandria; font-size: $font-size-base; font-weight: 700; border: none; border-radius: 14px; -webkit-tap-highlight-color: transparent; }
+.share-btn { color: $color-primary; background: $color-bg-card; border: 2px solid $color-primary; }
+.share-btn:active { transform: scale(0.97); }
+.copy-btn { color: $color-text-on-primary; background: linear-gradient(135deg, $color-primary, #b84a6a); }
 .copy-btn:active { transform: scale(0.97); }
 .copy-msg { font-family: $font-almarai; font-size: $font-size-sm; color: $color-success; text-align: center; margin-top: $spacing-sm; font-weight: 600; }
 </style>
