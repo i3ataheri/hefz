@@ -1,5 +1,12 @@
 @use 'variables' as *;
 
+@font-face { font-family: 'Alexandria'; font-style: normal; font-weight: 400 800; font-display: swap; src: url('/fonts/alexandria-arabic.woff2') format('woff2'); }
+@font-face { font-family: 'Cairo'; font-style: normal; font-weight: 400 800; font-display: swap; src: url('/fonts/cairo-arabic.woff2') format('woff2'); }
+@font-face { font-family: 'Almarai'; font-style: normal; font-weight: 300; font-display: swap; src: url('/fonts/almarai-light.woff2') format('woff2'); }
+@font-face { font-family: 'Almarai'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/almarai-regular.woff2') format('woff2'); }
+@font-face { font-family: 'Almarai'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/almarai-bold.woff2') format('woff2'); }
+@font-face { font-family: 'Almarai'; font-style: normal; font-weight: 800; font-display: swap; src: url('/fonts/almarai-extrabold.woff2') format('woff2'); }
+
 html {
   box-sizing: border-box;
 }
