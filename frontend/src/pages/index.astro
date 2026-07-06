@@ -16,6 +16,10 @@ import Layout from '../layouts/Layout.astro';
         <div class="status-desc">يتم جلب البيانات يرجى الانتظار</div>
       </div>
     </div>
+    <div class="sat-toggle" id="sat-toggle" style="display:none">
+      <span class="sat-toggle-label">السبت</span>
+      <button class="sat-toggle-btn" id="sat-toggle-btn" role="switch">غير فعال</button>
+    </div>
     <div class="member-section" id="member-section">
       <div class="empty-msg">جاري تحميل قائمة الأسماء...</div>
     </div>
@@ -47,7 +51,26 @@ async function main() {
       supabase.from('managers').select('name').order('sort_order'),
     ]);
 
-    const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
+    let satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
+    // Saturday toggle
+    const satToggle = document.getElementById('sat-toggle');
+    const satBtn = document.getElementById('sat-toggle-btn');
+    if (satToggle && satBtn) {
+      satToggle.style.display = 'flex';
+      satBtn.textContent = satEnabled ? 'فعال' : 'غير فعال';
+      satBtn.classList.toggle('active', satEnabled);
+      satBtn.onclick = async function () {
+        const newVal = !satBtn.classList.contains('active');
+        satBtn.disabled = true;
+        try {
+          await supabase.rpc('toggle_saturday', { new_value: newVal });
+          satEnabled = newVal;
+          satBtn.textContent = newVal ? 'فعال' : 'غير فعال';
+          satBtn.classList.toggle('active', newVal);
+        } catch {}
+        satBtn.disabled = false;
+      };
+    }
     const priorityMember = pResult.status === 'fulfilled' && pResult.value.data?.value ? String(pResult.value.data.value) : '';
     const allMembers = mResult.status === 'fulfilled' ? (mResult.value.data || []) : [];
     let regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
@@ -454,6 +477,11 @@ $font-almarai: 'Almarai', sans-serif;
 .msg--success { background: #f0f7f0; color: $color-success; }
 .msg--error { background: #fef0f0; color: $color-error; }
 .footer { font-family: $font-almarai; text-align: center; padding: $spacing-lg 0 $spacing-md; color: $color-text-light; font-size: $font-size-sm; font-weight: 300; }
+.sat-toggle { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: $spacing-sm; margin-bottom: $spacing-md; }
+.sat-toggle-label { font-family: $font-almarai; font-size: $font-size-sm; color: $color-text-light; }
+.sat-toggle-btn { font-family: $font-almarai; font-size: $font-size-sm; padding: 6px 16px; border-radius: 20px; border: 1px solid $color-border; background: $color-bg-card; color: $color-text-light; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
+.sat-toggle-btn.active { background: $color-primary; color: $color-text-on-primary; border-color: $color-primary; }
+.sat-toggle-btn:disabled { opacity: 0.5; }
 .report-section { margin-top: $spacing-lg; padding: $spacing-lg; background: $color-bg-card; border-radius: 16px; box-shadow: $shadow-sm; border: 1px solid $color-border; }
 .report-summary { text-align: center; margin-bottom: $spacing-md; }
 .report-title { font-family: $font-alexandria; font-size: 1.2rem; font-weight: 800; color: $color-primary-dark; margin-bottom: $spacing-xs; }
