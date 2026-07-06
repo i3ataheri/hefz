@@ -29,11 +29,7 @@ if (!env.VITE_SUPABASE_ANON_KEY) env.VITE_SUPABASE_ANON_KEY = process.env.VITE_S
 
 export default defineConfig({
   output: 'static',
-  adapter: vercel({
-    webAnalytics: {
-      enabled: true,
-    },
-  }),
+  adapter: vercel(),
   vite: {
     css: {
       preprocessorOptions: {
