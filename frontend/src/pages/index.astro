@@ -40,14 +40,14 @@ async function main() {
 
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Riyadh' });
     const [sResult, pResult, mResult, rResult, mgrResult] = await Promise.allSettled([
-      supabase.from('settings').select('value').eq('key', 'is_saturday_enabled').single(),
+      supabase.from('settings').select('bool_value').eq('key', 'is_saturday_enabled').single(),
       supabase.from('settings').select('value').eq('key', 'priority_member').single(),
       supabase.from('members').select('name'),
       supabase.from('registrations').select('name,created_at').eq('registered_date', today).order('created_at'),
       supabase.from('managers').select('name').order('sort_order'),
     ]);
 
-    const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
+    const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.bool_value === true) : false;
     const priorityMember = pResult.status === 'fulfilled' && pResult.value.data?.value ? String(pResult.value.data.value) : '';
     const allMembers = mResult.status === 'fulfilled' ? (mResult.value.data || []) : [];
     let regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
