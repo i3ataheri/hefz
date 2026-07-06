@@ -63,11 +63,12 @@ async function main() {
         const newVal = !satBtn.classList.contains('active');
         satBtn.disabled = true;
         try {
-          await supabase.rpc('toggle_saturday', { new_value: newVal });
+          const { error } = await supabase.rpc('toggle_saturday', { new_value: newVal });
+          if (error) { alert('خطا: ' + error.message); return; }
           satEnabled = newVal;
           satBtn.textContent = newVal ? 'فعال' : 'غير فعال';
           satBtn.classList.toggle('active', newVal);
-        } catch {}
+        } catch (e) { alert('خطا: ' + e.message); }
         satBtn.disabled = false;
       };
     }
