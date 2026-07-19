@@ -222,7 +222,6 @@ async function main() {
             const { error } = await supabase.from('registrations').insert({
               name: selectedName,
               registered_date: today,
-              created_at: now,
             });
             if (error) {
               msgEl.textContent = error.code === '23505' ? 'هذا الاسم مسجل مسبقًا اليوم.' : 'حدث خطأ. حاولي مرة أخرى.';
@@ -234,13 +233,16 @@ async function main() {
             }
             const savedName = selectedName;
             selectedName = '';
-            msgEl.textContent = 'تم تسجيل ' + savedName + '!';
-            msgEl.className = 'msg msg--success';
-            msgEl.style.display = 'block';
             registeredSet.add(savedName);
             regOrder[savedName] = regData.length;
             regData.push({ name: savedName, created_at: now });
             render(true);
+            const newMsg = document.getElementById('msg');
+            if (newMsg) {
+              newMsg.textContent = 'تم تسجيل ' + savedName + '!';
+              newMsg.className = 'msg msg--success';
+              newMsg.style.display = 'block';
+            }
           } catch {
             msgEl.textContent = 'خطأ في الاتصال. تحققي من اتصالك.';
             msgEl.className = 'msg msg--error';
