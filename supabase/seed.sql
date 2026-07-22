@@ -1,22 +1,20 @@
--- ============================================================
--- Seed Data for حلقة القرآن
--- Run this AFTER schema.sql
--- ============================================================
+-- بيانات أولية لحلقة تحفيظ القرآن
+-- شغّل هذا الملف بعد schema.sql
 
--- Insert managers (replace with actual names)
--- IMPORTANT: names must EXACTLY match the members table below
+-- إدراج المديرات
+-- الأسماء لازم تكون مطابقة بالضبط لجدول الأعضاء
 INSERT INTO managers (name, sort_order, pin) VALUES
-  ('أولياء',          1, '1234'),
-  ('دعاء',            2, '2345'),
-  ('منيرة',           3, '3456'),
-  ('مريم',            4, '4567'),
-  ('عائشة أبوعقيل',   5, '5678'),
-  ('طيف',             6, '6789'),
-  ('دانا',            7, '7891'),
-  ('حنان',            8, '8912'),
-  ('إيمان أحمد',      9, '9123');
+  ('أولياء',          1, ''),
+  ('دعاء',            2, ''),
+  ('منيرة',           3, ''),
+  ('مريم',            4, ''),
+  ('عائشة أبوعقيل',   5, ''),
+  ('طيف',             6, ''),
+  ('دانا',            7, ''),
+  ('حنان',            8, ''),
+  ('إيمان أحمد',      9, '');
 
--- Insert members list (all names including managers)
+-- إدراج قائمة الأعضاء (بما فيها المديرات)
 INSERT INTO members (name, sort_order) VALUES
   ('أولياء',                 1),
   ('دعاء',                   2),
@@ -94,11 +92,11 @@ INSERT INTO members (name, sort_order) VALUES
   ('ولاء أبوبكر',           74),
   ('ولاء محمد',             75);
 
--- Insert default settings
+-- إعدادات النظام
 INSERT INTO settings (key, value) VALUES
   ('is_saturday_enabled', 'false'::jsonb);
 
--- Insert priority members (appear right after managers in sort)
+-- الأعضاء المميزين (يظهرن بعد المديرات في الترتيب)
 INSERT INTO priority_members (name, sort_order) VALUES
   ('ولاء عجينة', 1),
   ('هدى الغماس', 2);
