@@ -39,16 +39,17 @@ async function main() {
     if (!supabase) throw new Error('Supabase client is null');
 
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Riyadh' });
-    const [sResult, pResult, mResult, rResult, mgrResult] = await Promise.allSettled([
+    const [sResult, pmResult, mResult, rResult, mgrResult] = await Promise.allSettled([
       supabase.from('settings').select('value').eq('key', 'is_saturday_enabled').single(),
-      supabase.from('settings').select('value').eq('key', 'priority_member').single(),
+      supabase.from('priority_members').select('name').order('sort_order'),
       supabase.from('members').select('name'),
       supabase.from('registrations').select('name,created_at').eq('registered_date', today).order('created_at'),
       supabase.from('managers').select('name').order('sort_order'),
     ]);
 
     const satEnabled = sResult.status === 'fulfilled' ? (sResult.value.data?.value === true) : false;
-    const priorityMember = pResult.status === 'fulfilled' && pResult.value.data?.value ? String(pResult.value.data.value) : '';
+    const priorityMembers = pmResult.status === 'fulfilled' ? (pmResult.value.data || []).map(p => p.name) : [];
+    const prioritySet = new Set(priorityMembers);
     const allMembers = mResult.status === 'fulfilled' ? (mResult.value.data || []) : [];
     let regData = rResult.status === 'fulfilled' ? (rResult.value.data || []) : [];
     const managers = mgrResult.status === 'fulfilled' ? (mgrResult.value.data || []).map(m => m.name) : [];
@@ -110,8 +111,8 @@ async function main() {
         const bMgr = managerSet.has(b.name);
         const aToday = a.name === todayManager;
         const bToday = b.name === todayManager;
-        const aPri = priorityMember && a.name === priorityMember;
-        const bPri = priorityMember && b.name === priorityMember;
+        const aPri = prioritySet.has(a.name);
+        const bPri = prioritySet.has(b.name);
 
         const g = (isToday, isMgr, isPri) => isToday ? 0 : isMgr ? 1 : isPri ? 2 : 3;
         const ga = g(aToday, aMgr, aPri);

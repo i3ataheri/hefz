@@ -31,7 +31,15 @@ CREATE TABLE IF NOT EXISTS members (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 4. Registrations table (daily registrations)
+-- 4. Priority members table (non-manager members who appear right after managers)
+CREATE TABLE IF NOT EXISTS priority_members (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5. Registrations table (daily registrations)
 CREATE TABLE IF NOT EXISTS registrations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -55,6 +63,7 @@ ALTER TABLE managers ADD COLUMN IF NOT EXISTS pin TEXT NOT NULL DEFAULT '';
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE managers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE priority_members ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies (safe to re-run)
 DROP POLICY IF EXISTS "allow_anonymous_insert_registrations" ON registrations;
@@ -62,6 +71,7 @@ DROP POLICY IF EXISTS "allow_anonymous_select_registrations" ON registrations;
 DROP POLICY IF EXISTS "allow_anonymous_select_settings" ON settings;
 DROP POLICY IF EXISTS "allow_anonymous_select_managers" ON managers;
 DROP POLICY IF EXISTS "allow_anonymous_select_members" ON members;
+DROP POLICY IF EXISTS "allow_anonymous_select_priority_members" ON priority_members;
 
 -- Allow anonymous insert for registration
 CREATE POLICY "allow_anonymous_insert_registrations"
@@ -90,6 +100,12 @@ CREATE POLICY "allow_anonymous_select_managers"
 -- Allow anonymous select for members
 CREATE POLICY "allow_anonymous_select_members"
   ON members FOR SELECT
+  TO anon
+  USING (true);
+
+-- Allow anonymous select for priority members
+CREATE POLICY "allow_anonymous_select_priority_members"
+  ON priority_members FOR SELECT
   TO anon
   USING (true);
 

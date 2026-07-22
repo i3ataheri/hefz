@@ -96,5 +96,9 @@ INSERT INTO members (name, sort_order) VALUES
 
 -- Insert default settings
 INSERT INTO settings (key, value) VALUES
-  ('is_saturday_enabled', 'false'::jsonb),
-  ('priority_member', '"هدى الغماس"'::jsonb);
+  ('is_saturday_enabled', 'false'::jsonb);
+
+-- Insert priority members (appear right after managers in sort)
+INSERT INTO priority_members (name, sort_order) VALUES
+  ('ولاء عجينة', 1),
+  ('هدى الغماس', 2);
